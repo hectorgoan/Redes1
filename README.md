@@ -1,0 +1,2 @@
+# Redes
+Copyright @hectorgoan && @daverkex
