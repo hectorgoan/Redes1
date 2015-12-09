@@ -1,0 +1,9 @@
+FICHAR id_evento id_usuario 09/11/2015 11:11:30
+HOLA id_usuario
+LISTAR EVENTOS
+FICHAR id_evento id_usuario 08/11/2015 11:11:30
+FICHA id_evento id_usuario 08/11/2015 11:11:30
+FICHAR id_evento id_usuario_1 09/11/2015 11:11:30
+FICHAR id_evento id_usuario 09/11/2015 11:11:30
+LISTAR id_evento id_usuario
+ADIOS id_usuario
