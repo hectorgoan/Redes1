@@ -1,3 +1,10 @@
+#####################################
+# Fichero: makefile
+# Autores: 
+# Héctor Gonzalo Andrés DNI 71038384D
+# Néstor 
+#####################################
+
 all: cliente servidor
 
 cliente: cliente.o
