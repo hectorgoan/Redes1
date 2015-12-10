@@ -19,7 +19,7 @@
 #include <time.h> 
 #include "mylib.h"
 #include <signal.h>
-#include "TADlista.h"
+
 
 #define PORT 5030
 #define BACKLOG 10	//Defines the maximum lenght to wich the queue of
@@ -39,8 +39,7 @@ void main(void)
 	signal(SIGINT, INThandler);	//Will detect SIGINT (ctrl+c)
 	
 	//Variable declaration zone
-	
-	
+
 
 	int serverfd = 0;	//Will store server's file descriptor
 	int clientfd = 0;	//Will store client's file descriptor
@@ -120,6 +119,8 @@ void main(void)
 
 }
 
+
+//Other functions
 void  INThandler(int sig)	
 {
 	//::::::::::::::::::::::::::::::::::::::::::::
@@ -148,14 +149,11 @@ void ObtainUsersFromString (char *strWithUsers)
    	const char *token;
    	token = strtok(str, s);
 
-   	char myUsers[6][10];
-   	
    	while( token != NULL ) //GUARDA MAL
    	{
    		//printf("%d\n", i);
   		printf("%s\n", token );
-  		strcpy(myUsers[i], token);
-  		//printf("%s\n", myUsers[i]);
+
   		i++;  		
     
    	   	token = strtok(NULL, s);

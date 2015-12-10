@@ -16,3 +16,5 @@ make
 zenity --info --text="Se han lanzado 1 ventana!\nEn la terminal original se ejecuta el servidor.\nEn la nueva se ejecuta el cliente\nPulse crtl+c en el servidor para salir" --title="Atención!" &
 ./servidor & xterm -hold -e ./cliente 127.0.0.1
 
+
+
