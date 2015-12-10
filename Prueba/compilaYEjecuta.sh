@@ -1,6 +1,5 @@
 #! /bin/sh
-gcc -g servidorDeFechas.c -o servidor
-gcc -g clienteConsultorFecha.c -o cliente 
+make
 #lanza dos nuevas ventanas de terminal cada una con un ejecutable
 #para terminar, hacer ctrl+c en la ventana de terminal principal
 
