@@ -31,7 +31,7 @@ void main(void)
 	//Welcome message
 	//system ("tput clear");
 	printf("Hola!, soy el servidor, vivo aquí\n");
-	signal(SIGINT, INThandler);
+	signal(SIGINT, INThandler);	//Will detect SIGINT (ctrl+c)
 	
 	//Variable declaration zone
 	int serverfd = 0;	//Will store server's file descriptor
@@ -90,7 +90,7 @@ void main(void)
     		printf("Error al aceptar una llamada entrante\n");
     		exit (-1);
     	}
-    	//flag = 1;
+    	
     	
 
         ticks = time(NULL);
@@ -106,7 +106,8 @@ void main(void)
 
 }
 
-void  INThandler(int sig)
+void  INThandler(int sig)	//Will handle SIGINT (ctrl+c)
 {
+	printf("Bye!\n");
 	exit (0);
 }
