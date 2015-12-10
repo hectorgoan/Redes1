@@ -13,7 +13,8 @@
 #include <time.h> 
 
 #define PORT 5030
-
+#define BACKLOG 10	//Defines the maximum lenght to wich the queue of
+					//pending connections for serverfd may grow
 //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::://
 //						PROGRAM's BODY
 //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::://
@@ -33,9 +34,10 @@ void main(void)
     time_t ticks;			//Will be used to build the response message
 
     int sin_size;
+    int flag = 0;
 
     //Function's body
-    if ((serverfd = socket(AF_INET, SOCK_STREAM, 0)) == -1)
+    if ((serverfd = socket(AF_INET, SOCK_STREAM, 0)) == -1)	//SOCK_STREAM TCP
     {
     	printf("Error en la llamada a socket()\n");
     	exit (-1);
@@ -50,11 +52,20 @@ void main(void)
     serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
     serv_addr.sin_port = htons(PORT); 
 
-    bind(serverfd, (struct sockaddr*)&serv_addr, sizeof(serv_addr)); 
+    if ((bind(serverfd, (struct sockaddr*)&serv_addr, sizeof(serv_addr))) == -1)
+    {
+    	printf("Error en la llamada a bind()\n");
+    	exit (-1);
+    }
 
-    listen(serverfd, 10); 
+    if ((listen(serverfd, BACKLOG)) == -1)
+    {
+    	printf("Error en la llamada a listen()\n");
+    	exit (-1);
+    }
+     
 
-    while(1)
+    while(flag != 1)
     {
 
     	sin_size = sizeof(struct sockaddr_in);
@@ -63,6 +74,8 @@ void main(void)
     		printf("Error al aceptar una llamada entrante\n");
     		exit (-1);
     	}
+    	flag = 1;
+    	
 
         ticks = time(NULL);
 
