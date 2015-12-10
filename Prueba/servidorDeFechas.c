@@ -12,9 +12,17 @@
 #include <sys/types.h>
 #include <time.h> 
 
+#include <signal.h>
+
 #define PORT 5030
 #define BACKLOG 10	//Defines the maximum lenght to wich the queue of
 					//pending connections for serverfd may grow
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::://
+//							HEADERS
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::://
+void INThandler(int);
+
 //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::://
 //						PROGRAM's BODY
 //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::://
@@ -23,6 +31,7 @@ void main(void)
 	//Welcome message
 	//system ("tput clear");
 	printf("Hola!, soy el servidor, vivo aquí\n");
+	signal(SIGINT, INThandler);
 	
 	//Variable declaration zone
 	int serverfd = 0;	//Will store server's file descriptor
@@ -35,6 +44,8 @@ void main(void)
 
     int sin_size;
     int flag = 0;
+    int resultadoBind;
+
 
     //Function's body
     if ((serverfd = socket(AF_INET, SOCK_STREAM, 0)) == -1)	//SOCK_STREAM TCP
@@ -52,8 +63,10 @@ void main(void)
     serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
     serv_addr.sin_port = htons(PORT); 
 
-    if ((bind(serverfd, (struct sockaddr*)&serv_addr, sizeof(serv_addr))) == -1)
+    resultadoBind = bind(serverfd, (struct sockaddr *) &serv_addr, sizeof(struct sockaddr));
+    if ((resultadoBind) == -1)
     {
+    	printf("resultadoBind %d\n", resultadoBind);
     	printf("Error en la llamada a bind()\n");
     	exit (-1);
     }
@@ -65,16 +78,19 @@ void main(void)
     }
      
 
+
     while(flag != 1)
     {
+    	
 
     	sin_size = sizeof(struct sockaddr_in);
-    	if ((clientfd = accept(serverfd, (struct sockaddr*)&client_addr, &(sin_size))) == -1)
+    	printf("%d\n", sin_size);
+    	if ((clientfd = accept(serverfd, (struct sockaddr*) &client_addr, &(sin_size))) == -1)
     	{
     		printf("Error al aceptar una llamada entrante\n");
     		exit (-1);
     	}
-    	flag = 1;
+    	//flag = 1;
     	
 
         ticks = time(NULL);
@@ -88,4 +104,9 @@ void main(void)
 
 	
 
+}
+
+void  INThandler(int sig)
+{
+	exit (0);
 }
