@@ -54,12 +54,16 @@ void main(void)
     int resultadoSockOpt;
     int iSetOption = 1;
 
+
+
 	/*	by using this we'll se all users printed in servers terminal
 		it's just an example*/
 
 	char *stringWithContentOfTextFile = ObtainStringFromTextFile();
 	ObtainUsersFromString(stringWithContentOfTextFile);
     //*/
+
+
 
     //Function's body starts here!
     if ((serverfd = socket(AF_INET, SOCK_STREAM, 0)) == -1)	//SOCK_STREAM TCP
@@ -68,7 +72,7 @@ void main(void)
     	exit (-1);
     }
 
-    if ((setsockopt(serverfd, SOL_SOCKET, SO_REUSEADDR, (char*)&iSetOption, sizeof(iSetOption))) == -1)
+    if ((setsockopt(serverfd, SOL_SOCKET, SO_REUSEADDR, (char*)&iSetOption, sizeof(iSetOption))) == -1)	//Only avaliable in linux 2.7+
     {
     	printf("Error en la llamada a setsockopt()\n");
     	exit (-1);
@@ -108,14 +112,13 @@ void main(void)
     	/*
     	sin_size = sizeof(struct sockaddr_in);
     	printf("%d\n", sin_size);*/
+    	printf("Conexión entrante\n");
     	if ((clientfd = accept(serverfd, (struct sockaddr*) &client_addr, &(sin_size))) == -1)
     	{
     		printf("Error al aceptar una llamada entrante\n");
     		exit (-1);
     	}
     	
-    	
-
         ticks = time(NULL);
 
         snprintf(sendBuff, sizeof(sendBuff), "%.24s\r\n", ctime(&ticks));
@@ -141,35 +144,69 @@ void  INThandler(int sig)
 	exit (0); 
 }
 
-void ObtainUsersFromString (char *strWithUsers)
+char* ObtainUsersFromString (char *strWithUsers)
 {
 	//::::::::::::::::::::::::::::::::::::::::::::
 	//This function obtains the users contained in
 	//msg, separated by /
 	//::::::::::::::::::::::::::::::::::::::::::::
-	char *str = strWithUsers;
+	char *str2 = strWithUsers;
+	char *str;
+	memcpy(str, str2, sizeof(strWithUsers)/sizeof(char*));
+
+	int r=0;
 	int l=0;
 	int i=0;
-	int j=0;
+	l=ObtainNumberOfUsersFromString(str2);
 
-	//printf("%s\n", str);
-	
+	//printf("%d\n", l);
+
 	const char s[2] = "/";
-
-	
+	char* users[l];
    	const char *token;
    	token = strtok(str, s);
 
-   	while( token != NULL ) //GUARDA MAL
+   	while(token != NULL) 
+   	{   		
+  		//printf("%s\n", token);
+  		users[i] = token;
+   	   	token = strtok(NULL, s);
+   	   	i++;
+   	}
+   	/*
+   	for (r = 0; r < l; r++)	//it works
    	{
-   		//printf("%d\n", i);
-  		printf("%s\n", token );
+   		printf("%s\n", users[r]);
+   	}*/
+
+   	return users;
+
+}
+
+int ObtainNumberOfUsersFromString (char *strWithUsers)
+{
+	//::::::::::::::::::::::::::::::::::::::::::::
+	//This function obtains the number of users 
+	//contained in msg, separated by /
+	//::::::::::::::::::::::::::::::::::::::::::::
+	char *str = strWithUsers;
+	
+	int i=0;
+	const char s[2] = "/";
+   	const char *token;
+
+   	token = strtok(str, s);
+
+   	while(token != NULL) 
+   	{
 
   		i++;  		
     
    	   	token = strtok(NULL, s);
    	}
-
+   	
+   	printf("%d\n", i);
+   	return i;
 
 }
 
@@ -177,7 +214,7 @@ char* ObtainStringFromTextFile (void)
 {
 	//::::::::::::::::::::::::::::::::::::::::::::::::::
 	//This function extracts the content of usuarios.txt
-	//and store it in a string
+	//and store it in a "string"
 	//::::::::::::::::::::::::::::::::::::::::::::::::::
 	char *stringToReturn = 0;
 	char *stringToModify = 0;
