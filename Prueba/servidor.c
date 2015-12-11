@@ -62,7 +62,7 @@ void main(void)
 	char *stringWithContentOfTextFile = ObtainStringFromTextFile();
 	ObtainUsersFromString(stringWithContentOfTextFile);
     //*/
-
+	int r=0;
 
 
     //Function's body starts here!
@@ -144,7 +144,7 @@ void  INThandler(int sig)
 	exit (0); 
 }
 
-char* ObtainUsersFromString (char *strWithUsers)
+void ObtainUsersFromString (char *strWithUsers)
 {
 	//::::::::::::::::::::::::::::::::::::::::::::
 	//This function obtains the users contained in
@@ -173,13 +173,13 @@ char* ObtainUsersFromString (char *strWithUsers)
    	   	token = strtok(NULL, s);
    	   	i++;
    	}
+
    	/*
-   	for (r = 0; r < l; r++)	//it works
+   	for (r = 0; r < l; r++)	//it works---------------------------------en users tengo los usuarios--------------------------------
    	{
    		printf("%s\n", users[r]);
    	}*/
 
-   	return users;
 
 }
 

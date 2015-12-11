@@ -9,7 +9,7 @@
 #define HEADER_SERVIDOR
 
 void INThandler(int);
-char* ObtainUsersFromString (char*);
+void ObtainUsersFromString (char*);
 char* ObtainStringFromTextFile (void);
 char *replaceStringAforStringB(char *str, char *a, char *b);
 int ObtainNumberOfUsersFromString (char *strWithUsers);
