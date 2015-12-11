@@ -5,7 +5,7 @@
 ** Néstor 
 */
 //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::://
-//				INCLUDE's & DEFINE's SECTION
+//			INCLUDE's, DEFINE's & GLOBAL VAR's SECTION
 //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::://
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -24,7 +24,7 @@
 #define PORT 5030
 #define BACKLOG 10	//Defines the maximum lenght to wich the queue of
 					//pending connections for serverfd may grow
-
+int flag = 0;
 
 
 //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::://
@@ -39,19 +39,20 @@ void main(void)
 	signal(SIGINT, INThandler);	//Will detect SIGINT (ctrl+c)
 	
 	//Variable declaration zone
-
-
 	int serverfd = 0;	//Will store server's file descriptor
 	int clientfd = 0;	//Will store client's file descriptor
+
+	
     struct sockaddr_in serv_addr;	//Will store server's address info
     struct sockaddr_in client_addr;	//Will store client's address info
 
     char sendBuff[1025];	//Will be sent to the client
     time_t ticks;			//Will be used to build the response message
 
-    int sin_size;
-    int flag = 0;
+    int sin_size;    
     int resultadoBind;
+    int resultadoSockOpt;
+    int iSetOption = 1;
 
 	/*	by using this we'll se all users printed in servers terminal
 		it's just an example*/
@@ -67,6 +68,13 @@ void main(void)
     	exit (-1);
     }
 
+    if ((setsockopt(serverfd, SOL_SOCKET, SO_REUSEADDR, (char*)&iSetOption, sizeof(iSetOption))) == -1)
+    {
+    	printf("Error en la llamada a setsockopt()\n");
+    	exit (-1);
+    }
+    
+
 
     memset(&serv_addr, '0', sizeof(serv_addr));
     memset(sendBuff, '0', sizeof(sendBuff)); 
@@ -75,6 +83,8 @@ void main(void)
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
     serv_addr.sin_port = htons(PORT); 
+
+    
 
     resultadoBind = bind(serverfd, (struct sockaddr *) &serv_addr, sizeof(struct sockaddr));
     if ((resultadoBind) == -1)
@@ -95,9 +105,9 @@ void main(void)
     while(flag != 1)
     {
     	
-
+    	/*
     	sin_size = sizeof(struct sockaddr_in);
-    	printf("%d\n", sin_size);
+    	printf("%d\n", sin_size);*/
     	if ((clientfd = accept(serverfd, (struct sockaddr*) &client_addr, &(sin_size))) == -1)
     	{
     		printf("Error al aceptar una llamada entrante\n");
@@ -127,7 +137,8 @@ void  INThandler(int sig)
 	//This function handles when ctrl+c is pushed
 	//::::::::::::::::::::::::::::::::::::::::::::
 	printf("Adios!\n");
-	exit (0);
+	flag = 1;
+	exit (0); 
 }
 
 void ObtainUsersFromString (char *strWithUsers)
