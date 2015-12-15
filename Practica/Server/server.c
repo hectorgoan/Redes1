@@ -1,3 +1,5 @@
+#define _XOPEN_SOURCE /* glibc2 needs this */
+
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
@@ -20,17 +22,20 @@ void logg(const char* string);
 int validateCmd(const char* command, char* result);
 
 void handler_hola(const int socket, char* command);
+void handler_listar(const int socket, char* command);
 void handler_fichar(const int socket, char* command);
 
 void str_cut(char* string, const char cutter);
 int isUserValid(const char* user);
 int isUserInEvent(char* idEvent, char* idUser);
-int validateDateForEvent(char* date);
+int validateDateForEvent(char* idEvent, char* date);
+time_t makeDateFromString(char* date);
+void fichar(char* idEvent, char* idUser, char* date);
 
 int main(void)
 {
     setpgid(0, 0);
-    switch(fork())
+    /*switch(fork())
     {
         case -1:
             error("ERROR en fork.");
@@ -43,7 +48,8 @@ int main(void)
         default:
             sleep(60);
             exit(0);
-    }
+    }*/
+    daemonFn();
 }
 
 void error(const char* msg)
@@ -55,9 +61,9 @@ void error(const char* msg)
 
 void daemonFn(void)
 {
-    fclose(stdin);
-    fclose(stdout);
-    fclose(stderr);
+    //fclose(stdin);
+    //fclose(stdout);
+    //fclose(stderr);
     
     struct sigaction sa = {.sa_handler = SIG_IGN};
     sigaction(SIGCHLD, &sa, NULL);
@@ -93,7 +99,7 @@ void daemonFn(void)
             error("ERROR al aceptar conexion.");
         }
         
-        switch(fork())
+        /*switch(fork())
         {
             case -1:
                 error("ERROR en fork.");
@@ -105,7 +111,8 @@ void daemonFn(void)
                 break;
             default:
                 close(sckTCP);
-        }
+        }*/
+        session(sckTCP, cliAddr);
     }
     close(sockfd);
     return;
@@ -142,32 +149,42 @@ void session(int socket, struct sockaddr_in cliAddr)
             (char*)ctime(&tTime));
     logg(log);
     
-    if(buffLen = recv(socket, buffer, BUFFERSIZE, 0) == -1)
+    int end = 0;
+    while(!end)
     {
-        error("ERROR: Failed to receive.");
+        if(buffLen = recv(socket, buffer, BUFFERSIZE, 0) == -1)
+        {
+            error("ERROR: Failed to receive.");
+        }
+
+        buffer[BUFFERSIZE] = '\0';
+
+        switch (validateCmd(buffer, NULL))
+        {
+            case 1: //HOLA
+                str_cut(buffer, ' ');
+                handler_hola(socket, buffer);
+                break;
+            case 2: //LISTAR
+                str_cut(buffer, ' ');
+                handler_listar(socket, buffer);
+                break;
+            case 3: //LISTAR EVENTOS
+                str_cut(buffer, ' ');
+                break;
+            case 4: //FICHAR
+                str_cut(buffer, ' ');
+                handler_fichar(socket, buffer);
+                break;
+            case 5: //ADIOS
+                str_cut(buffer, ' ');
+                close(socket);
+                end = 1;
+                break;
+            default: //ERROR
+                send(socket, "ERROR Invalid command.\0", 23, 0);
+        }
     }
-    
-    buffer[BUFFERSIZE] = '\0';
-    
-    switch (validateCmd(buffer, NULL))
-    {
-        case 1: //HOLA
-            str_cut(buffer, ' ');
-            handler_hola(socket, buffer);
-            break;
-        case 2: //LISTAR
-            break;
-        case 3: //LISTAR EVENTOS
-            break;
-        case 4: //FICHAR
-            handler_fichar(socket, buffer);
-            break;
-        case 5: //ADIOS
-            break;
-        default: //ERROR
-            send(socket, "ERROR Invalid command.\n", 23, 0);
-    }
-    close(socket);
 }
 
 void logg(const char* string)
@@ -179,7 +196,7 @@ void logg(const char* string)
         return;
     }
     
-    fprintf(log, "%s\n", string);
+    fprintf(log, "%s", string);
     
     fclose(log);
 }
@@ -194,7 +211,7 @@ int validateCmd(const char* command, char* result)
         }
         return 1;
     }
-    else if(strncmp(command, "LISTAR", 6))
+    else if(strncmp(command, "LISTAR", 6) == 0)
     {
         if(result != NULL)
         {
@@ -202,7 +219,7 @@ int validateCmd(const char* command, char* result)
         }
         return 2;
     }
-    else if(strncmp(command, "LISTAR EVENTOS", 14))
+    else if(strncmp(command, "LISTAR EVENTOS", 14) == 0)
     {
         if(result != NULL)
         {
@@ -210,7 +227,7 @@ int validateCmd(const char* command, char* result)
         }
         return 3;
     }
-    else if(strncmp(command, "FICHAR", 6))
+    else if(strncmp(command, "FICHAR", 6) == 0)
     {
         if(result != NULL)
         {
@@ -218,7 +235,7 @@ int validateCmd(const char* command, char* result)
         }
         return 4;
     }
-    else if(strncmp(command, "ADIOS", 5))
+    else if(strncmp(command, "ADIOS", 5) == 0)
     {
         if(result != NULL)
         {
@@ -237,11 +254,11 @@ void handler_hola(const int socket, char* command)
 {
     if(isUserValid(command))
     {
-        send(socket, "CORRECTO\n", 9, 0);
+        send(socket, "CORRECTO\0", 9, 0);
     }
     else
     {
-        send(socket, "ERROR Invalid user.\n", 20, 0);
+        send(socket, "ERROR Invalid user.\0", 20, 0);
     }
 }
 
@@ -257,20 +274,38 @@ void handler_fichar(const int socket, char* command)
     
     pch = strtok(command, " ");
     strcpy(idEvent, pch);
-    
-    str_cut(command, ' ');
-    pch = strtok(command, " ");
+    pch = strtok(NULL, " ");
     strcpy(idUser, pch);
+    pch = strtok(NULL, " ");
+    strcpy(date, pch);
     
-    strcpy(command, baseCommand);
-    str_cut(command, ' ');
-    str_cut(command, ' ');
-    strcpy(date, command);
-    
-    if(isUserInEvent(idEvent, idUser) && validateDateForEvent(date))
+    char log[50];
+    time_t tTime;
+    time(&tTime);
+    if(isUserInEvent(idEvent, idUser) && validateDateForEvent(idEvent, date))
     {
-        
+        fichar(idEvent, idUser, date);
+        send(socket, "CORRECTO\0", 9, 0);
+        sprintf(log, "CORRECT \"FICHAR\" from %s in event %s at %s",
+                idUser,
+                idEvent,
+                (char*)ctime(&tTime));
+        logg(log);
     }
+    else
+    {
+        send(socket, "ERROR Invalid user or date.\0", 28, 0);
+        sprintf(log, "ERROR \"FICHAR\" from %s in event %s at %s",
+                idUser,
+                idEvent,
+                (char*)ctime(&tTime));
+        logg(log);
+    }
+}
+
+void handler_listar(const int socket, char* command)
+{
+    
 }
 
 int isUserValid(const char* user)
@@ -279,7 +314,6 @@ int isUserValid(const char* user)
     if(!users)
     {
         error("ERROR: Open file.");
-        return -1;
     }
     
     char* pch;
@@ -305,32 +339,40 @@ void str_cut(char* string, const char cutter)
 {
     char* pch;
     pch = strchr(string, cutter);
-    strcpy(pch, string);
+    if(pch == NULL)
+    {
+        error("NULL pointer.");
+    }
+    strcpy(string, pch + 1);
 }
 
 int isUserInEvent(char* idEvent, char* idUser)
 {
-    FILE* file = fopen("usuarios-eventos.txt", "r");
-    if(!file)
-    {
-        error("ERROR: Open file.");
-        return -1;
-    }
-    
     char* pch;
     char line[150];
     
     char user[40];
-    char Event[40];
+    char event[40];
+    
+    FILE* file = fopen("usuarios-eventos.txt", "r");
+    if(!file)
+    {
+        error("ERROR: Open file.");
+    }
     
     while(fgets(line, 150, file) != NULL)
     {
         pch = strtok(line, "#");
         strcpy(user, pch);
         pch = strtok(NULL, "#");
-        strcpy(idEvent, pch);
+        strcpy(event, pch);
+        pch = strchr(event, '\r');
+        if(pch != NULL)
+        {
+            strncpy(pch, "\0", 1);
+        }
         
-        if(strcmp(idEvent, Event) == 0 && strcmp(user, idUser) == 0)
+        if(strcmp(idEvent, event) == 0 && strcmp(idUser, user) == 0)
         {
             fclose(file);
             return 1;
@@ -341,33 +383,84 @@ int isUserInEvent(char* idEvent, char* idUser)
     return 0;
 }
 
-int validateDateForEvent(char* date)
+int validateDateForEvent(char* idEvent, char* date)
 {
-    // 01/12/2015 14:00:00
-    struct tm* parsedTime;
-    int year, month;
-    
-    sscanf(date, "%d/%d/%d %d:%d:%d",
-            parsedTime->tm_mday,
-            &month,
-            &year,
-            parsedTime->tm_hour,
-            parsedTime->tm_min, 
-            parsedTime->tm_sec);
-    
-    parsedTime->tm_year = year - 1900;
-    parsedTime->tm_mon = month -1;
+    char* pch;
+    char line[150];
     
     FILE* events = fopen("./eventos.txt", "r");
     if(!events)
     {
         error("ERROR: Open file.");
-        return -1;
     }
-    //Incomplete
     
+    while(fgets(line, 150, events) != NULL)
+    {
+        pch = strtok(line, "#");
+        if(strcmp(pch, idEvent) == 0)
+        {
+            break;
+        }
+    }
     
-    
+    if(feof(events))
+    {
+        fclose(events);
+        return 0;
+    }
     fclose(events);
-    if(difftime())
+    
+    char initDate[25];
+    char endDate[25];
+
+    //pch = strtok(line, "#");
+    pch = strtok(NULL, "#");
+    pch = strtok(NULL, "#");
+    strcpy(initDate, pch);
+    pch = strtok(NULL, "#");
+    strcpy(endDate, pch);
+    pch = strchr(endDate, '\r');
+    if (pch != NULL)
+    {
+        strncpy(pch, "\0", 1);
+    }
+    
+    time_t ParseDate = makeDateFromString(date);
+    
+    return difftime(ParseDate, makeDateFromString(initDate)) > 0
+           && difftime(makeDateFromString(endDate), ParseDate) > 0 ?
+                1 : 0;
+}
+
+time_t makeDateFromString(char* date)
+{
+    char* pch;
+    pch = strchr(date, ' ');
+    if(pch != NULL)
+    {
+        strncpy(pch, ";", 1);
+    }
+    // 21/12/2015 14:00:00
+    struct tm parsedTime;
+    strptime(date, "%d/%m/%Y;%H:%M:%S", &parsedTime);
+    return mktime(&parsedTime);
+}
+
+void fichar(char* idEvent, char* idUser, char* date)
+{
+    char record[150];
+    strcpy(record, idEvent);
+    strcat(record, "#");
+    strcat(record, idUser);
+    strcat(record, "#");
+    strcat(record, date);
+    
+    FILE* f = fopen("./fichajes.txt", "a+");
+    if(!f)
+    {
+        error("ERROR: Open file.");
+    }
+    
+    fputs(record, f);
+    fclose(f);
 }

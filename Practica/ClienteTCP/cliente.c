@@ -104,6 +104,13 @@ int readCommand(const char* file, const int line, char* command)
             return 0;
         }
     }
+    char* pch;
+    pch = strchr(command, '\r');
+    if (pch != NULL)
+    {
+        strncpy(pch, "\0", 1);
+    }
+    
     fclose(cmf);
     return 1;
 }
@@ -112,8 +119,25 @@ void sendCommand(const int socket, char* command)
 {
     char buffer[BUFFERSIZE];
     size_t buffLen;
+    char cmd[150];
+    time_t tTime;
+    struct tm* timeinfo;
+    char sTime[50];
     
-    send(socket, command, strlen(command), 0);
+    if(strncmp(command, "FICHAR", 6) == 0)
+    {
+        strcpy(cmd, command);
+        time(&tTime);
+        timeinfo = localtime(&tTime);
+        strftime(sTime, 50, "%d/%m/%G;%T", timeinfo);
+        sprintf(cmd, "%s %s", command, sTime);
+        send(socket, cmd, strlen(cmd) + 1, 0);
+    }
+    else
+    {
+        send(socket, command, strlen(command) + 1, 0);
+    }
+    
     if(buffLen = recv(socket, buffer, BUFFERSIZE, 0) == -1)
     {
         error("ERROR: Failed to receive.");

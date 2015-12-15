@@ -1,0 +1,3 @@
+id_usuario#id_evento
+id_usuario#id_evento_1
+pepe#id_evento
