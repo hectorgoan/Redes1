@@ -34,6 +34,7 @@ int validateDateForEvent(char* idEvent, char* date);
 time_t makeDateFromString(char* date);
 void fichar(char* idEvent, char* idUser, char* date);
 int isUserLogged(const int socket);
+void areNecessaryFiles(void);
 
 int gLogged = 0;
 
@@ -69,6 +70,8 @@ void daemonFn(void)
     //fclose(stdin);
     //fclose(stdout);
     //fclose(stderr);
+    
+    areNecessaryFiles();
     
     struct sigaction sa = {.sa_handler = SIG_IGN};
     sigaction(SIGCHLD, &sa, NULL);
@@ -197,7 +200,7 @@ void logg(const char* string)
     FILE* log = fopen("./fichajes.log", "a");
     if(!log)
     {
-        error("ERROR: Open file.");
+        error("ERROR: Open file");
         return;
     }
     
@@ -286,7 +289,7 @@ void handler_listarEventos(const int socket)
     FILE* events = fopen("./eventos.txt", "r");
     if(!events)
     {
-        error("ERROR: Open file.");
+        error("ERROR: Open file");
     }
     
     time(&tTime);
@@ -333,7 +336,7 @@ void handler_listar(const int socket, char* command)
     FILE* f = fopen("./usuarios-eventos.txt", "r");
     if(!f)
     {
-        error("ERROR: Open file.");
+        error("ERROR: Open file");
     }
     
     while(fgets(line, 150, f) != NULL)
@@ -429,7 +432,7 @@ int isUserValid(const char* user)
     FILE* users = fopen("./usuarios.txt", "r");
     if(!users)
     {
-        error("ERROR: Open file.");
+        error("ERROR: Open file");
     }
     
     char* pch;
@@ -473,7 +476,7 @@ int isUserInEvent(char* idEvent, char* idUser)
     FILE* file = fopen("usuarios-eventos.txt", "r");
     if(!file)
     {
-        error("ERROR: Open file.");
+        error("ERROR: Open file");
     }
     
     while(fgets(line, 150, file) != NULL)
@@ -507,7 +510,7 @@ int validateDateForEvent(char* idEvent, char* date)
     FILE* events = fopen("./eventos.txt", "r");
     if(!events)
     {
-        error("ERROR: Open file.");
+        error("ERROR: Open file");
     }
     
     while(fgets(line, 150, events) != NULL)
@@ -574,7 +577,7 @@ void fichar(char* idEvent, char* idUser, char* date)
     FILE* f = fopen("./fichajes.txt", "a+");
     if(!f)
     {
-        error("ERROR: Open file.");
+        error("ERROR: Open file");
     }
     
     fputs(record, f);
@@ -592,4 +595,29 @@ int isUserLogged(const int socket)
         send(socket, "ERROR You need to be login first.\0", 34, 0);
         return 0;
     }
+}
+
+void areNecessaryFiles(void)
+{
+    FILE* f;
+    f = fopen("./fichajes.txt", "r");
+    if(!f)
+    {
+        error("ERROR: Open file");
+    }
+    fclose(f);
+    
+    f = fopen("./usuarios.txt", "r");
+    if(!f)
+    {
+        error("ERROR: Open file");
+    }
+    fclose(f);
+    
+    f = fopen("./usuarios-eventos.txt", "r");
+    if(!f)
+    {
+        error("ERROR: Open file");
+    }
+    fclose(f);
 }
