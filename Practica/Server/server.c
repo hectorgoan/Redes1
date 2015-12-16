@@ -53,10 +53,8 @@ int main(void)
             exit(0);
             break;
         default:
-            sleep(5);
             exit(0);
     }
-    //daemonFn();
 }
 
 void error(const char* msg)
@@ -68,9 +66,9 @@ void error(const char* msg)
 
 void daemonFn(void)
 {
-    //fclose(stdin);
-    //fclose(stdout);
-    //fclose(stderr);
+    fclose(stdin);
+    fclose(stdout);
+    fclose(stderr);
     
     areNecessaryFiles();
     
@@ -122,7 +120,7 @@ void daemonFn(void)
             error("ERROR al aceptar conexion.");
         }
         
-        /*switch(fork())
+        switch(fork())
         {
             case -1:
                 error("ERROR en fork.");
@@ -134,8 +132,7 @@ void daemonFn(void)
                 break;
             default:
                 close(sckTCP);
-        }*/
-        session(sckTCP, cliAddr);
+        }
     }
     close(sockfd);
     return;
