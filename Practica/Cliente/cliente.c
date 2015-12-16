@@ -13,8 +13,14 @@
 
 void error(const char* msg);
 int readCommand(const char* file, const int line, char* command);
-void sendCommand(const int socket, char* command);
+void sendCommand(const int socket, struct sockaddr_in servAddr, char* command);
 void str_cut(char* string, const char cutter);
+ssize_t avSend(int socket, const void* buff, size_t n,
+		       int flags, __CONST_SOCKADDR_ARG addr);
+ssize_t avRecv(int socket, void* buff, size_t n,
+			 int flags, __SOCKADDR_ARG addr);
+
+int gIsTCP;
 
 int main(int argc, char *argv[])
 {
@@ -23,33 +29,24 @@ int main(int argc, char *argv[])
         error("ERROR Bad number of arguments");
     }
     
-    int sockfd, sckTCP;
-    struct hostent* server;
+    int sockfd;
     struct addrinfo hints;
+    struct addrinfo* servAddrInfo;
     memset(&hints, 0, sizeof(hints));
-    hints.ai_family = AF_INET;    /* Allow IPv4 or IPv6 */
-    hints.ai_socktype = SOCK_DGRAM; /* Datagram socket */
-    hints.ai_flags = AI_PASSIVE;    /* For wildcard IP address */
-    hints.ai_protocol = 0;          /* Any protocol */
-    
-    struct addrinfo* addressInfo;
-    memset(&addressInfo, 0, sizeof(addressInfo));
-    
-    
-    if(getaddrinfo(argv[1], NULL, &hints, &addressInfo) != 0)
+    hints.ai_family = AF_INET;
+    if(getaddrinfo(argv[1], NULL, &hints, &servAddrInfo))
     {
         error("ERROR solving host");
     }
     
-    struct sockaddr_in servAddr, myAddr;
+    struct sockaddr_in servAddr;
     memset(&servAddr, 0, sizeof(servAddr));
-    memset(&myAddr, 0, sizeof(servAddr));
+    
     
     servAddr.sin_family = AF_INET;
-    servAddr.sin_addr.s_addr = INADDR_ANY;
-    servAddr.sin_addr = ((struct sockaddr_in*)addressInfo->ai_addr)->sin_addr;
-    freeaddrinfo(addressInfo);
+    servAddr.sin_addr = ((struct sockaddr_in*)servAddrInfo->ai_addr)->sin_addr;
     servAddr.sin_port = htons(PORT);
+    freeaddrinfo(servAddrInfo);
     
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if(sockfd == -1)
@@ -57,11 +54,18 @@ int main(int argc, char *argv[])
         error("ERROR: opening socket");
     }
     
-    if(connect(sockfd, (const struct sockaddr*)&servAddr, sizeof(servAddr)) == -1)
+    if(strcmp(argv[2], "TCP") == 0)
     {
-        error("ERROR: Unable to connect to remote");
+        gIsTCP = 1;
+        if(connect(sockfd, (struct sockaddr*)&servAddr, sizeof(servAddr)) == -1)
+        {
+            error("ERROR: Unable to connect to remote");
+        }
     }
-    
+    else
+    {
+        gIsTCP = 0;
+    }
     
     char command[150];
     int i = 0;
@@ -71,7 +75,7 @@ int main(int argc, char *argv[])
         flag = readCommand(argv[3], i, command);
         if(flag)
         {
-            sendCommand(sockfd, command);
+            sendCommand(sockfd, servAddr, command);
         }
         i++;
     }
@@ -115,7 +119,7 @@ int readCommand(const char* file, const int line, char* command)
     return 1;
 }
 
-void sendCommand(const int socket, char* command)
+void sendCommand(const int socket, struct sockaddr_in servAddr, char* command)
 {
     char buffer[BUFFERSIZE];
     size_t buffLen;
@@ -131,8 +135,10 @@ void sendCommand(const int socket, char* command)
         timeinfo = localtime(&tTime);
         strftime(sTime, 50, "%d/%m/%G;%T", timeinfo);
         sprintf(cmd, "%s %s", command, sTime);
-        send(socket, cmd, strlen(cmd) + 1, 0);
-        if(buffLen = recv(socket, buffer, BUFFERSIZE, 0) == -1)
+        avSend(socket, cmd, strlen(cmd) + 1, 0,
+                (struct sockaddr*)&servAddr);
+        if(buffLen = avRecv(socket, buffer, BUFFERSIZE, 0,
+                (struct sockaddr*)&servAddr) == -1)
         {
             error("ERROR: Failed to receive");
         }
@@ -141,10 +147,12 @@ void sendCommand(const int socket, char* command)
     }
     else if(strncmp(command, "LISTAR", 6) == 0)
     {
-        send(socket, command, strlen(command) + 1, 0);
+        avSend(socket, command, strlen(command) + 1, 0,
+                (struct sockaddr*)&servAddr);
         while(1)
         {
-            if(buffLen = recv(socket, buffer, BUFFERSIZE, 0) == -1)
+            if(buffLen = avRecv(socket, buffer, BUFFERSIZE, 0,
+                (struct sockaddr*)&servAddr) == -1)
             {
                 error("ERROR: Failed to receive");
             }
@@ -161,8 +169,10 @@ void sendCommand(const int socket, char* command)
     }
     else
     {
-        send(socket, command, strlen(command) + 1, 0);
-        if(buffLen = recv(socket, buffer, BUFFERSIZE, 0) == -1)
+        avSend(socket, command, strlen(command) + 1, 0,
+                (struct sockaddr*)&servAddr);
+        if(buffLen = avRecv(socket, buffer, BUFFERSIZE, 0,
+                (struct sockaddr*)&servAddr) == -1)
         {
             error("ERROR: Failed to receive");
         }
@@ -181,4 +191,32 @@ void str_cut(char* string, const char cutter)
         error("NULL pointer");
     }
     strcpy(string, pch + 1);
+}
+
+ssize_t avSend(int socket, const void* buff, size_t n,
+		       int flags, __CONST_SOCKADDR_ARG addr)
+{
+    socklen_t len = sizeof(__CONST_SOCKADDR_ARG);
+    if(gIsTCP)
+    {
+        return send(socket, buff, n, flags);
+    }
+    else
+    {
+        return sendto(socket, buff, n, flags, addr, len);
+    }
+}
+
+ssize_t avRecv(int socket, void * buff, size_t n,
+			 int flags, __SOCKADDR_ARG addr)
+{
+    socklen_t len = sizeof(__CONST_SOCKADDR_ARG);
+    if(gIsTCP)
+    {
+        return recv(socket, buff, n, flags);
+    }
+    else
+    {
+        return recvfrom(socket, buff, n, flags, addr, &len);
+    }
 }

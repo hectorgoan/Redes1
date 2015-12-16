@@ -36,6 +36,12 @@ void fichar(char* idEvent, char* idUser, char* date);
 int isUserLogged(const int socket);
 void areNecessaryFiles(void);
 void signalHandler(int signal);
+ssize_t avSend(int socket, const void* buff, size_t n,
+		       int flags, __CONST_SOCKADDR_ARG addr);
+ssize_t avRecv(int socket, void* buff, size_t n,
+			 int flags, __SOCKADDR_ARG addr);
+
+int gIsTCP;
 
 int gLogged = 0;
 
@@ -53,6 +59,7 @@ int main(void)
             exit(0);
             break;
         default:
+            sleep(60);
             exit(0);
     }
 }
@@ -157,7 +164,7 @@ void session(int socket, struct sockaddr_in cliAddr)
                  0,
                  0);
     
-    inet_ntop(AF_INET, &(cliAddr. sin_addr), hostname, sizeof(hostname));
+    inet_ntop(AF_INET, &(cliAddr.sin_addr), hostname, sizeof(hostname));
     ip = inet_ntoa(cliAddr.sin_addr);
     
     time(&tTime);
@@ -653,4 +660,32 @@ void signalHandler(int signal)
     }
     printf("Fin de ejecucion\n");
 	exit(EXIT_SUCCESS);
+}
+
+ssize_t avSend(int socket, const void* buff, size_t n,
+		       int flags, __CONST_SOCKADDR_ARG addr)
+{
+    socklen_t len = sizeof(__CONST_SOCKADDR_ARG);
+    if(gIsTCP)
+    {
+        return send(socket, buff, n, flags);
+    }
+    else
+    {
+        return sendto(socket, buff, n, flags, addr, len);
+    }
+}
+
+ssize_t avRecv(int socket, void * buff, size_t n,
+			 int flags, __SOCKADDR_ARG addr)
+{
+    socklen_t len = sizeof(__CONST_SOCKADDR_ARG);
+    if(gIsTCP)
+    {
+        return recv(socket, buff, n, flags);
+    }
+    else
+    {
+        return recvfrom(socket, buff, n, flags, addr, &len);
+    }
 }
