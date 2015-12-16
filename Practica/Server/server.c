@@ -33,6 +33,9 @@ int isUserInEvent(char* idEvent, char* idUser);
 int validateDateForEvent(char* idEvent, char* date);
 time_t makeDateFromString(char* date);
 void fichar(char* idEvent, char* idUser, char* date);
+int isUserLogged(const int socket);
+
+int gLogged = 0;
 
 int main(void)
 {
@@ -257,6 +260,7 @@ void handler_hola(const int socket, char* command)
 {
     if(isUserValid(command))
     {
+        gLogged = 1;
         send(socket, "CORRECTO\0", 9, 0);
     }
     else
@@ -267,6 +271,10 @@ void handler_hola(const int socket, char* command)
 
 void handler_listarEventos(const int socket)
 {
+    if(!isUserLogged(socket))
+    {
+        return;
+    }
     char* pch;
     char line[150];
     char lineCp[150];
@@ -305,6 +313,10 @@ void handler_listarEventos(const int socket)
 
 void handler_listar(const int socket, char* command)
 {
+    if(!isUserLogged(socket))
+    {
+        return;
+    }
     char* pch;
     char line[150];
     char lineCp[150];
@@ -354,6 +366,10 @@ void handler_listar(const int socket, char* command)
 
 void handler_fichar(const int socket, char* command)
 {
+    if(!isUserLogged(socket))
+    {
+        return;
+    }
     char cmdEvent[40];
     char cmdUser[40];
     char date[40];
@@ -392,8 +408,13 @@ void handler_fichar(const int socket, char* command)
 
 void handler_adios(const int socket, char* command)
 {
+    if(!isUserLogged(socket))
+    {
+        return;
+    }
     if(isUserValid(command))
     {
+        gLogged = 0;
         send(socket, "CORRECTO\0", 9, 0);
     }
     else
@@ -558,4 +579,17 @@ void fichar(char* idEvent, char* idUser, char* date)
     
     fputs(record, f);
     fclose(f);
+}
+
+int isUserLogged(const int socket)
+{
+    if(gLogged == 1)
+    {
+        return 1;
+    }
+    else
+    {
+        send(socket, "ERROR You need to be login first.\0", 34, 0);
+        return 0;
+    }
 }
