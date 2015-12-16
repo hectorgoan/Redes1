@@ -20,30 +20,30 @@ int main(int argc, char *argv[])
 {
     if(argc < 4)
     {
-        error("ERROR Bad number of arguments.\n");
+        error("ERROR Bad number of arguments");
     }
     
     int sockfd, sckTCP;
     struct hostent* server;
     struct addrinfo hints;
-    bzero(&hints, sizeof(hints));
+    memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_INET;    /* Allow IPv4 or IPv6 */
     hints.ai_socktype = SOCK_DGRAM; /* Datagram socket */
     hints.ai_flags = AI_PASSIVE;    /* For wildcard IP address */
     hints.ai_protocol = 0;          /* Any protocol */
     
     struct addrinfo* addressInfo;
-    bzero(&addressInfo, sizeof(addressInfo));
+    memset(&addressInfo, 0, sizeof(addressInfo));
     
     
     if(getaddrinfo(argv[1], NULL, &hints, &addressInfo) != 0)
     {
-        error("ERROR solving host.\n");
+        error("ERROR solving host");
     }
     
     struct sockaddr_in servAddr, myAddr;
-    bzero(&servAddr, sizeof(servAddr));
-    bzero(&myAddr, sizeof(servAddr));
+    memset(&servAddr, 0, sizeof(servAddr));
+    memset(&myAddr, 0, sizeof(servAddr));
     
     servAddr.sin_family = AF_INET;
     servAddr.sin_addr.s_addr = INADDR_ANY;
@@ -54,12 +54,12 @@ int main(int argc, char *argv[])
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if(sockfd == -1)
     {
-        error("ERROR: opening socket.\n");
+        error("ERROR: opening socket");
     }
     
     if(connect(sockfd, (const struct sockaddr*)&servAddr, sizeof(servAddr)) == -1)
     {
-        error("ERROR: Unable to connect to remote.\n");
+        error("ERROR: Unable to connect to remote");
     }
     
     
@@ -92,7 +92,7 @@ int readCommand(const char* file, const int line, char* command)
     FILE* cmf = fopen(file, "r");
     if(!cmf)
     {
-        error("ERROR: Open file.");
+        error("ERROR: Open file");
     }
     
     int i;
@@ -132,18 +132,43 @@ void sendCommand(const int socket, char* command)
         strftime(sTime, 50, "%d/%m/%G;%T", timeinfo);
         sprintf(cmd, "%s %s", command, sTime);
         send(socket, cmd, strlen(cmd) + 1, 0);
+        if(buffLen = recv(socket, buffer, BUFFERSIZE, 0) == -1)
+        {
+            error("ERROR: Failed to receive");
+        }
+        buffer[BUFFERSIZE] = '\0';
+        puts(buffer);
+    }
+    else if(strncmp(command, "LISTAR", 6) == 0)
+    {
+        send(socket, command, strlen(command) + 1, 0);
+        while(1)
+        {
+            if(buffLen = recv(socket, buffer, BUFFERSIZE, 0) == -1)
+            {
+                error("ERROR: Failed to receive");
+            }
+            buffer[BUFFERSIZE] = '\0';
+            if(strncmp(buffer, "\n", 1) != 0)
+            {
+                puts(buffer);
+            }
+            else
+            {
+                break;
+            }
+        }
     }
     else
     {
         send(socket, command, strlen(command) + 1, 0);
+        if(buffLen = recv(socket, buffer, BUFFERSIZE, 0) == -1)
+        {
+            error("ERROR: Failed to receive");
+        }
+        buffer[BUFFERSIZE] = '\0';
+        puts(buffer);
     }
-    
-    if(buffLen = recv(socket, buffer, BUFFERSIZE, 0) == -1)
-    {
-        error("ERROR: Failed to receive.");
-    }
-    buffer[BUFFERSIZE] = '\0';
-    puts(buffer);
 }
 
 //Cut the string for the first second param: ("This is a example.", " ") -> "is a example."
@@ -151,5 +176,9 @@ void str_cut(char* string, const char cutter)
 {
     char* pch;
     pch = strchr(string, cutter);
-    strcpy(pch, string);
+    if(pch == NULL)
+    {
+        error("NULL pointer");
+    }
+    strcpy(string, pch + 1);
 }

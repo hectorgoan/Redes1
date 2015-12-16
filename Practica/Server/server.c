@@ -22,8 +22,10 @@ void logg(const char* string);
 int validateCmd(const char* command, char* result);
 
 void handler_hola(const int socket, char* command);
+void handler_listarEventos(const int socket);
 void handler_listar(const int socket, char* command);
 void handler_fichar(const int socket, char* command);
+void handler_adios(const int socket, char* command);
 
 void str_cut(char* string, const char cutter);
 int isUserValid(const char* user);
@@ -71,8 +73,8 @@ void daemonFn(void)
     int sockfd, sckTCP;
     
     struct sockaddr_in servAddr, cliAddr;
-    bzero(&servAddr, sizeof(servAddr));
-    bzero(&cliAddr, sizeof(servAddr));
+    memset(&servAddr, 0, sizeof(servAddr));
+    memset(&cliAddr, 0, sizeof(servAddr));
     
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if(sockfd == -1)
@@ -170,7 +172,7 @@ void session(int socket, struct sockaddr_in cliAddr)
                 handler_listar(socket, buffer);
                 break;
             case 3: //LISTAR EVENTOS
-                str_cut(buffer, ' ');
+                handler_listarEventos(socket);
                 break;
             case 4: //FICHAR
                 str_cut(buffer, ' ');
@@ -178,7 +180,7 @@ void session(int socket, struct sockaddr_in cliAddr)
                 break;
             case 5: //ADIOS
                 str_cut(buffer, ' ');
-                close(socket);
+                handler_adios(socket, buffer);
                 end = 1;
                 break;
             default: //ERROR
@@ -211,7 +213,8 @@ int validateCmd(const char* command, char* result)
         }
         return 1;
     }
-    else if(strncmp(command, "LISTAR", 6) == 0)
+    else if(strncmp(command, "LISTAR", 6) == 0
+            && strncmp(command, "LISTAR EVENTOS", 14) != 0)
     {
         if(result != NULL)
         {
@@ -262,33 +265,117 @@ void handler_hola(const int socket, char* command)
     }
 }
 
+void handler_listarEventos(const int socket)
+{
+    char* pch;
+    char line[150];
+    char lineCp[150];
+    char idEvent[50];
+    time_t tTime;
+    struct tm* timeinfo;
+    char sTime[50];
+    
+    FILE* events = fopen("./eventos.txt", "r");
+    if(!events)
+    {
+        error("ERROR: Open file.");
+    }
+    
+    time(&tTime);
+    timeinfo = localtime(&tTime);
+    strftime(sTime, 50, "%d/%m/%G;%T", timeinfo);
+    
+    while(fgets(line, 150, events) != NULL)
+    {
+        strcpy(lineCp, line);
+        pch = strtok(lineCp, "#");
+        strcpy(idEvent, pch);
+        if(validateDateForEvent(idEvent, sTime))
+        {
+            pch = strchr(line, '\r');
+            if (pch != NULL)
+            {
+                strncpy(pch, "\0", 1);
+            }
+            send(socket, line, strlen(line) + 1, 0);
+        }
+    }
+    send(socket, "\n\0", 2, 0);    
+}
+
+void handler_listar(const int socket, char* command)
+{
+    char* pch;
+    char line[150];
+    char lineCp[150];
+    char cmdUser[40];
+    char cmdEvent[40];
+    char user[40];
+    char event[40];
+    
+    pch = strtok(command, " ");
+    strcpy(cmdEvent, pch);
+    pch = strtok(NULL, " ");
+    strcpy(cmdUser, pch);
+    
+    FILE* f = fopen("./usuarios-eventos.txt", "r");
+    if(!f)
+    {
+        error("ERROR: Open file.");
+    }
+    
+    while(fgets(line, 150, f) != NULL)
+    {
+        strcpy(lineCp, line);
+        pch = strchr(lineCp, '\r');
+        if(pch != NULL)
+        {
+            strncpy(pch, "\0", 1);
+        }
+        pch = strtok(line, "#");
+        strcpy(user, pch);
+        pch = strtok(NULL, "#");
+        strcpy(event, pch);
+        pch = strchr(event, '\r');
+        if(pch != NULL)
+        {
+            strncpy(pch, "\0", 1);
+        }
+        
+        if(strcmp(cmdUser, user) == 0 && strcmp(cmdEvent, event) == 0)
+        {
+            send(socket, lineCp, strlen(lineCp) + 1, 0);
+        }
+    }
+    send(socket, "\n\0", 2, 0);
+    
+    fclose(f);
+}
+
 void handler_fichar(const int socket, char* command)
 {
-    char idEvent[40];
-    char idUser[40];
+    char cmdEvent[40];
+    char cmdUser[40];
     char date[40];
     char* pch;
     
-    char baseCommand[BUFFERSIZE];
-    strcpy(baseCommand, command);
-    
     pch = strtok(command, " ");
-    strcpy(idEvent, pch);
+    strcpy(cmdEvent, pch);
     pch = strtok(NULL, " ");
-    strcpy(idUser, pch);
+    strcpy(cmdUser, pch);
     pch = strtok(NULL, " ");
     strcpy(date, pch);
     
-    char log[50];
+    char log[150];
     time_t tTime;
     time(&tTime);
-    if(isUserInEvent(idEvent, idUser) && validateDateForEvent(idEvent, date))
+    if(isUserInEvent(cmdEvent, cmdUser) && validateDateForEvent(cmdEvent, date))
     {
-        fichar(idEvent, idUser, date);
+        fichar(cmdEvent, cmdUser, date);
         send(socket, "CORRECTO\0", 9, 0);
         sprintf(log, "CORRECT \"FICHAR\" from %s in event %s at %s",
-                idUser,
-                idEvent,
+                cmdUser,
+                cmdEvent,
                 (char*)ctime(&tTime));
         logg(log);
     }
@@ -296,16 +383,24 @@ void handler_fichar(const int socket, char* command)
     {
         send(socket, "ERROR Invalid user or date.\0", 28, 0);
         sprintf(log, "ERROR \"FICHAR\" from %s in event %s at %s",
-                idUser,
-                idEvent,
+                cmdUser,
+                cmdEvent,
                 (char*)ctime(&tTime));
         logg(log);
     }
 }
 
-void handler_listar(const int socket, char* command)
+void handler_adios(const int socket, char* command)
 {
-    
+    if(isUserValid(command))
+    {
+        send(socket, "CORRECTO\0", 9, 0);
+    }
+    else
+    {
+        send(socket, "ERROR Invalid user.\0", 20, 0);
+    }
+    close(socket);
 }
 
 int isUserValid(const char* user)
