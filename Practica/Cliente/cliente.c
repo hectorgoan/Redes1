@@ -42,29 +42,49 @@ int main(int argc, char *argv[])
     struct sockaddr_in servAddr;
     memset(&servAddr, 0, sizeof(servAddr));
     
-    
     servAddr.sin_family = AF_INET;
     servAddr.sin_addr = ((struct sockaddr_in*)servAddrInfo->ai_addr)->sin_addr;
     servAddr.sin_port = htons(PORT);
     freeaddrinfo(servAddrInfo);
     
-    sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    if(sockfd == -1)
-    {
-        error("ERROR: opening socket");
-    }
-    
     if(strcmp(argv[2], "TCP") == 0)
     {
         gIsTCP = 1;
-        if(connect(sockfd, (struct sockaddr*)&servAddr, sizeof(servAddr)) == -1)
+        sockfd = socket(AF_INET, SOCK_STREAM, 0);
+        if(sockfd == -1)
         {
-            error("ERROR: Unable to connect to remote");
+            error("ERROR: opening socket");
+        }
+    }
+    else if(strcmp(argv[2], "UDP") == 0)
+    {
+        gIsTCP = 0;
+        sockfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+        if(sockfd == -1)
+        {
+            error("ERROR: opening socket");
         }
     }
     else
     {
-        gIsTCP = 0;
+        error("ERROR bad argument");
+    }
+    
+    int val = 1;
+    if(setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR,
+            (char*)&val, sizeof(val)) == -1)
+    {
+        close(sockfd);
+        error("Error in setsockopt");
+    }
+    
+    if(gIsTCP)
+    {
+        if(connect(sockfd, (struct sockaddr*)&servAddr, sizeof(servAddr)) == -1)
+        {
+            close(sockfd);
+            error("ERROR: Unable to connect to remote");
+        }
     }
     
     char command[150];
@@ -82,13 +102,13 @@ int main(int argc, char *argv[])
     
     
     close(sockfd);
-    return 0;
+    return EXIT_SUCCESS;
 }
 
 void error(const char* msg)
 {
     perror(msg);
-    exit(1);
+    exit(EXIT_FAILURE);
 }
 
 int readCommand(const char* file, const int line, char* command)

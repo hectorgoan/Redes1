@@ -2,6 +2,7 @@
 
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include <sys/select.h>
 #include <sys/socket.h>
 #include <netdb.h>
 #include <time.h>
@@ -21,11 +22,14 @@ void session(int socket, struct sockaddr_in cliAddr);
 void logg(const char* string);
 int validateCmd(const char* command, char* result);
 
-void handler_hola(const int socket, char* command);
-void handler_listarEventos(const int socket);
-void handler_listar(const int socket, char* command);
-void handler_fichar(const int socket, char* command);
-void handler_adios(const int socket, char* command);
+void handler_hola(const int socket, struct sockaddr_in cliAddr, char* command);
+void handler_listarEventos(const int socket, struct sockaddr_in cliAddr);
+void handler_listar(const int socket,
+        struct sockaddr_in cliAddr, char* command);
+void handler_fichar(const int socket,
+        struct sockaddr_in cliAddr, char* command);
+void handler_adios(const int socket,
+        struct sockaddr_in cliAddr, char* command);
 
 void str_cut(char* string, const char cutter);
 int isUserValid(const char* user);
@@ -33,7 +37,7 @@ int isUserInEvent(char* idEvent, char* idUser);
 int validateDateForEvent(char* idEvent, char* date);
 time_t makeDateFromString(char* date);
 void fichar(char* idEvent, char* idUser, char* date);
-int isUserLogged(const int socket);
+int isUserLogged(const int socket, struct sockaddr_in cliAddr);
 void areNecessaryFiles(void);
 void signalHandler(int signal);
 ssize_t avSend(int socket, const void* buff, size_t n,
@@ -41,41 +45,41 @@ ssize_t avSend(int socket, const void* buff, size_t n,
 ssize_t avRecv(int socket, void* buff, size_t n,
 			 int flags, __SOCKADDR_ARG addr);
 
-int gIsTCP;
+int gIsTCP = 0;
 
 int gLogged = 0;
 
 int main(void)
 {
     setpgrp();
-    switch(fork())
+    /*switch(fork())
     {
         case -1:
-            error("ERROR en fork.");
-            exit(1);
+            error("ERROR in fork");
             break;
         case 0:
             daemonFn();
-            exit(0);
+            exit(EXIT_SUCCESS);
             break;
         default:
             sleep(60);
-            exit(0);
-    }
+            exit(EXIT_SUCCESS);
+    }*/
+    daemonFn();
 }
 
 void error(const char* msg)
 {
     perror(msg);
-    exit(1);
+    exit(EXIT_FAILURE);
 }
 
 
 void daemonFn(void)
 {
-    fclose(stdin);
-    fclose(stdout);
-    fclose(stderr);
+    //fclose(stdin);
+    //fclose(stdout);
+    //fclose(stderr);
     
     areNecessaryFiles();
     
@@ -96,16 +100,24 @@ void daemonFn(void)
         error("ERROR handling signals");
     }
   
-    int sockfd, sckTCP;
+    int sockfd, sckTCP, sckUDP;
     
     struct sockaddr_in servAddr, cliAddr;
     memset(&servAddr, 0, sizeof(servAddr));
     memset(&cliAddr, 0, sizeof(servAddr));
     
+    int val = 1;
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if(sockfd == -1)
     {
-        error("ERROR de apertura de socket");
+        error("ERROR opening socket");
+    }
+    
+    if(setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR,
+            (char*)&val, sizeof(val)) == -1)
+    {
+        close(sockfd);
+        error("Error in setsockopt");
     }
     
     servAddr.sin_family = AF_INET;
@@ -113,35 +125,83 @@ void daemonFn(void)
     servAddr.sin_port = htons(PORT);
     if(bind(sockfd, (struct sockaddr*)&servAddr, sizeof(servAddr)) == -1)
     {
-        error("ERROR al enlazar el socket.");
+        close(sockfd);
+        error("ERROR binding socket");
     }
    
-    listen(sockfd, 1024);
-    
-    socklen_t cliLen = sizeof(cliAddr);
-    while(1)
+    if(listen(sockfd, 16) == -1)
     {
-        sckTCP = accept(sockfd, (struct sockaddr*)&cliAddr, &cliLen);
-        if(sckTCP == -1)
+        close(sockfd);
+        error("ERROR listening socket");
+    }
+    
+    sckUDP = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    if(sckUDP == -1)
+    {
+        close(sockfd);
+        error("ERROR opening socket");
+    }
+    
+    if(setsockopt(sckUDP, SOL_SOCKET, SO_REUSEADDR,
+            (char*)&val, sizeof(val)) == -1)
+    {
+        close(sockfd);
+        close(sckUDP);
+        error("Error in setsockopt");
+    }
+    
+    if(bind(sckUDP, (struct sockaddr*)&servAddr, sizeof(servAddr)) == -1)
+    {
+        close(sockfd);
+        close(sckUDP);
+        error("ERROR binding socket");
+    }
+    
+    socklen_t cliLen = sizeof(cliAddr);   
+    int higher = sockfd > sckUDP ? sockfd : sckUDP;
+    fd_set readmask;
+    for(;;)
+    {
+        FD_ZERO(&readmask);
+        FD_SET(sockfd, &readmask);
+        FD_SET(sckUDP, &readmask); 
+        
+        if(select(higher + 1, &readmask, NULL, NULL, NULL) == -1)
         {
-            error("ERROR al aceptar conexion.");
+            error("ERROR selecting connection");
         }
         
-        switch(fork())
+        if(FD_ISSET(sockfd, &readmask))
         {
-            case -1:
-                error("ERROR en fork.");
-                break;
-            case 0:
-                close(sockfd);
-                session(sckTCP, cliAddr);
-                exit(0);
-                break;
-            default:
-                close(sckTCP);
+            sckTCP = accept(sockfd, (struct sockaddr*)&cliAddr, &cliLen);
+            if(sckTCP == -1)
+            {
+                error("ERROR accepting connection");
+            }
+
+            switch(fork())
+            {
+                case -1:
+                    error("ERROR in fork");
+                    break;
+                case 0:
+                    close(sockfd);
+                    gIsTCP = 1;
+                    session(sckTCP, cliAddr);
+                    exit(EXIT_SUCCESS);
+                    break;
+                default:
+                    close(sckTCP);
+            } 
+        }
+        
+        if(FD_ISSET(sckUDP, &readmask))
+        {
+            session(sckUDP, cliAddr);
         }
     }
     close(sockfd);
+    close(sckUDP);
     return;
 }
 
@@ -179,7 +239,8 @@ void session(int socket, struct sockaddr_in cliAddr)
     int end = 0;
     while(!end)
     {
-        if(buffLen = recv(socket, buffer, BUFFERSIZE, 0) == -1)
+        if(buffLen = avRecv(socket, buffer, BUFFERSIZE, 0,
+                (struct sockaddr*)&cliAddr) == -1)
         {
             error("ERROR: Failed to receive.");
         }
@@ -190,26 +251,27 @@ void session(int socket, struct sockaddr_in cliAddr)
         {
             case 1: //HOLA
                 str_cut(buffer, ' ');
-                handler_hola(socket, buffer);
+                handler_hola(socket, cliAddr, buffer);
                 break;
             case 2: //LISTAR
                 str_cut(buffer, ' ');
-                handler_listar(socket, buffer);
+                handler_listar(socket, cliAddr, buffer);
                 break;
             case 3: //LISTAR EVENTOS
-                handler_listarEventos(socket);
+                handler_listarEventos(socket, cliAddr);
                 break;
             case 4: //FICHAR
                 str_cut(buffer, ' ');
-                handler_fichar(socket, buffer);
+                handler_fichar(socket, cliAddr, buffer);
                 break;
             case 5: //ADIOS
                 str_cut(buffer, ' ');
-                handler_adios(socket, buffer);
+                handler_adios(socket, cliAddr, buffer);
                 end = 1;
                 break;
             default: //ERROR
-                send(socket, "ERROR Invalid command.\0", 23, 0);
+                avSend(socket, "ERROR Invalid command.\0", 23, 0,
+                        (struct sockaddr*)&cliAddr);
         }
     }
 }
@@ -278,22 +340,23 @@ int validateCmd(const char* command, char* result)
     }
 }
 
-void handler_hola(const int socket, char* command)
+void handler_hola(const int socket, struct sockaddr_in cliAddr, char* command)
 {
     if(isUserValid(command))
     {
         gLogged = 1;
-        send(socket, "CORRECTO\0", 9, 0);
+        avSend(socket, "CORRECTO\0", 9, 0, (struct sockaddr*)&cliAddr);
     }
     else
     {
-        send(socket, "ERROR Invalid user.\0", 20, 0);
+        avSend(socket, "ERROR Invalid user.\0", 20, 0,
+                (struct sockaddr*)&cliAddr);
     }
 }
 
-void handler_listarEventos(const int socket)
+void handler_listarEventos(const int socket, struct sockaddr_in cliAddr)
 {
-    if(!isUserLogged(socket))
+    if(!isUserLogged(socket, cliAddr))
     {
         return;
     }
@@ -327,15 +390,16 @@ void handler_listarEventos(const int socket)
             {
                 strncpy(pch, "\0", 1);
             }
-            send(socket, line, strlen(line) + 1, 0);
+            avSend(socket, line, strlen(line) + 1, 0,
+                    (struct sockaddr*)&cliAddr);
         }
     }
-    send(socket, "\n\0", 2, 0);    
+    avSend(socket, "\n\0", 2, 0, (struct sockaddr*)&cliAddr);    
 }
 
-void handler_listar(const int socket, char* command)
+void handler_listar(const int socket, struct sockaddr_in cliAddr, char* command)
 {
-    if(!isUserLogged(socket))
+    if(!isUserLogged(socket, cliAddr))
     {
         return;
     }
@@ -379,17 +443,18 @@ void handler_listar(const int socket, char* command)
         
         if(strcmp(cmdUser, user) == 0 && strcmp(cmdEvent, event) == 0)
         {
-            send(socket, lineCp, strlen(lineCp) + 1, 0);
+            avSend(socket, lineCp, strlen(lineCp) + 1, 0,
+                    (struct sockaddr*)&cliAddr);
         }
     }
-    send(socket, "\n\0", 2, 0);
+    avSend(socket, "\n\0", 2, 0, (struct sockaddr*)&cliAddr);
     
     fclose(f);
 }
 
-void handler_fichar(const int socket, char* command)
+void handler_fichar(const int socket, struct sockaddr_in cliAddr, char* command)
 {
-    if(!isUserLogged(socket))
+    if(!isUserLogged(socket, cliAddr))
     {
         return;
     }
@@ -411,7 +476,7 @@ void handler_fichar(const int socket, char* command)
     if(isUserInEvent(cmdEvent, cmdUser) && validateDateForEvent(cmdEvent, date))
     {
         fichar(cmdEvent, cmdUser, date);
-        send(socket, "CORRECTO\0", 9, 0);
+        avSend(socket, "CORRECTO\0", 9, 0, (struct sockaddr*)&cliAddr);
         sprintf(log, "CORRECT \"FICHAR\" from %s in event %s at %s",
                 cmdUser,
                 cmdEvent,
@@ -420,7 +485,8 @@ void handler_fichar(const int socket, char* command)
     }
     else
     {
-        send(socket, "ERROR Invalid user or date.\0", 28, 0);
+        avSend(socket, "ERROR Invalid user or date.\0", 28, 0,
+                (struct sockaddr*)&cliAddr);
         sprintf(log, "ERROR \"FICHAR\" from %s in event %s at %s",
                 cmdUser,
                 cmdEvent,
@@ -429,20 +495,21 @@ void handler_fichar(const int socket, char* command)
     }
 }
 
-void handler_adios(const int socket, char* command)
+void handler_adios(const int socket, struct sockaddr_in cliAddr, char* command)
 {
-    if(!isUserLogged(socket))
+    if(!isUserLogged(socket, cliAddr))
     {
         return;
     }
     if(isUserValid(command))
     {
         gLogged = 0;
-        send(socket, "CORRECTO\0", 9, 0);
+        avSend(socket, "CORRECTO\0", 9, 0, (struct sockaddr*)&cliAddr);
     }
     else
     {
-        send(socket, "ERROR Invalid user.\0", 20, 0);
+        avSend(socket, "ERROR Invalid user.\0", 20, 0,
+                (struct sockaddr*)&cliAddr);
     }
     close(socket);
 }
@@ -604,7 +671,7 @@ void fichar(char* idEvent, char* idUser, char* date)
     fclose(f);
 }
 
-int isUserLogged(const int socket)
+int isUserLogged(const int socket, struct sockaddr_in cliAddr)
 {
     if(gLogged == 1)
     {
@@ -612,7 +679,8 @@ int isUserLogged(const int socket)
     }
     else
     {
-        send(socket, "ERROR You need to be login first.\0", 34, 0);
+        avSend(socket, "ERROR You need to be login first.\0", 34, 0,
+                (struct sockaddr*)&cliAddr);
         return 0;
     }
 }
@@ -644,22 +712,8 @@ void areNecessaryFiles(void)
 
 void signalHandler(int signal)
 {
-    switch (signal)
-    {
-	case SIGUSR1:
-	    printf("He recibido la señal SIGUSR1\n");
-	    break;
-        case SIGUSR2:
-	    printf("He recibido la señal SIGUSR2\n");
-	    break;
-	case SIGINT:
-		printf("He recibido la señal SIGINT\n");
-		break;
-        case SIGTERM:
-    	printf("He recibido la señal SIGTERM\n");	    
-    }
-    printf("Fin de ejecucion\n");
-	exit(EXIT_SUCCESS);
+    puts("End of execution.");
+    exit(EXIT_SUCCESS);
 }
 
 ssize_t avSend(int socket, const void* buff, size_t n,
