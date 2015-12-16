@@ -35,13 +35,14 @@ time_t makeDateFromString(char* date);
 void fichar(char* idEvent, char* idUser, char* date);
 int isUserLogged(const int socket);
 void areNecessaryFiles(void);
+void signalHandler(int signal);
 
 int gLogged = 0;
 
 int main(void)
 {
-    setpgid(0, 0);
-    /*switch(fork())
+    setpgrp();
+    switch(fork())
     {
         case -1:
             error("ERROR en fork.");
@@ -52,10 +53,10 @@ int main(void)
             exit(0);
             break;
         default:
-            sleep(60);
+            sleep(5);
             exit(0);
-    }*/
-    daemonFn();
+    }
+    //daemonFn();
 }
 
 void error(const char* msg)
@@ -73,9 +74,23 @@ void daemonFn(void)
     
     areNecessaryFiles();
     
-    struct sigaction sa = {.sa_handler = SIG_IGN};
-    sigaction(SIGCHLD, &sa, NULL);
+    struct sigaction sh;
+    memset(&sh, 0, sizeof(sh));
+    sh.sa_handler = signalHandler;
+    sigemptyset(&sh.sa_mask);
+    sigaddset(&sh.sa_mask, SIGUSR1);
+    sigaddset(&sh.sa_mask, SIGUSR2);
+    sigaddset(&sh.sa_mask, SIGTERM);
+    sigaddset(&sh.sa_mask, SIGINT);
     
+    if(sigaction(SIGUSR1, &sh, NULL) == -1
+       || sigaction(SIGUSR2, &sh, NULL) == -1
+       || sigaction(SIGTERM, &sh, NULL) == -1
+       || sigaction(SIGINT, &sh, NULL) == -1)
+    {
+        error("ERROR handling signals");
+    }
+  
     int sockfd, sckTCP;
     
     struct sockaddr_in servAddr, cliAddr;
@@ -320,6 +335,7 @@ void handler_listar(const int socket, char* command)
     {
         return;
     }
+
     char* pch;
     char line[150];
     char lineCp[150];
@@ -620,4 +636,24 @@ void areNecessaryFiles(void)
         error("ERROR: Open file");
     }
     fclose(f);
+}
+
+void signalHandler(int signal)
+{
+    switch (signal)
+    {
+	case SIGUSR1:
+	    printf("He recibido la señal SIGUSR1\n");
+	    break;
+        case SIGUSR2:
+	    printf("He recibido la señal SIGUSR2\n");
+	    break;
+	case SIGINT:
+		printf("He recibido la señal SIGINT\n");
+		break;
+        case SIGTERM:
+    	printf("He recibido la señal SIGTERM\n");	    
+    }
+    printf("Fin de ejecucion\n");
+	exit(EXIT_SUCCESS);
 }
