@@ -1,0 +1,2 @@
+id_evento#descripción del evento#01/11/2015 09:00:00#01/01/2016 14:00:00
+id_evento_1#descripción del evento 1#01/11/2015 09:00:00#01/12/2015 14:00:00
