@@ -199,7 +199,8 @@ void sendCommand(const int socket, struct sockaddr_in servAddr, char* command)
     }
 }
 
-//Cut the string for the first second param: ("This is a example.", " ") -> "is a example."
+//Cut the string for the first second param:
+//("This is a example.", " ") -> "is a example."
 void str_cut(char* string, const char cutter)
 {
     char* pch;
