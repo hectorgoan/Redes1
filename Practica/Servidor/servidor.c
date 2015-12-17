@@ -7,6 +7,7 @@
 #include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/wait.h>
+#include <errno.h>
 #include <netdb.h>
 #include <time.h>
 #include <stdio.h>
@@ -78,9 +79,9 @@ void error(const char* msg)
 
 void daemonFn(void)
 {
-    fclose(stdin);
-    fclose(stdout);
-    fclose(stderr);
+    //fclose(stdin);
+    //fclose(stdout);
+    //fclose(stderr);
     
     areNecessaryFiles();
     
@@ -168,13 +169,16 @@ void daemonFn(void)
     socklen_t cliLen = sizeof(cliAddr);   
     int higher = sockfd > sckUDP ? sockfd : sckUDP;
     fd_set readmask;
+    
+    int activity;
     for(;;)
     {
         FD_ZERO(&readmask);
         FD_SET(sockfd, &readmask);
         FD_SET(sckUDP, &readmask); 
         
-        if(select(higher + 1, &readmask, NULL, NULL, NULL) == -1)
+        if(activity = select(higher + 1, &readmask, NULL, NULL, NULL) == -1
+           && errno != EINTR)
         {
             error("ERROR selecting connection");
         }
@@ -200,7 +204,7 @@ void daemonFn(void)
                     break;
                 default:
                     close(sckTCP);
-            } 
+            }
         }
         
         if(FD_ISSET(sckUDP, &readmask))

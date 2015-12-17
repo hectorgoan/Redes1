@@ -38,3 +38,5 @@ ehthumbs.db
 Thumbs.db
 /Practica/Cliente/build/
 /Practica/Cliente/dist/
+/Practica/Servidor/build/
+/Practica/Servidor/dist/
