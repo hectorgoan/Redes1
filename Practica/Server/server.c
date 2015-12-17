@@ -1,9 +1,12 @@
-#define _XOPEN_SOURCE /* glibc2 needs this */
+//#define _XOPEN_SOURCE /* glibc2 needs this */
+
+#define __EXTENSIONS__
 
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <sys/select.h>
 #include <sys/socket.h>
+#include <sys/wait.h>
 #include <netdb.h>
 #include <time.h>
 #include <stdio.h>
@@ -40,10 +43,11 @@ void fichar(char* idEvent, char* idUser, char* date);
 int isUserLogged(const int socket, struct sockaddr_in cliAddr);
 void areNecessaryFiles(void);
 void signalHandler(int signal);
+void childSignalHandler(int signal);
 ssize_t avSend(int socket, const void* buff, size_t n,
-		       int flags, __CONST_SOCKADDR_ARG addr);
+		       int flags, struct sockaddr* addr);
 ssize_t avRecv(int socket, void* buff, size_t n,
-			 int flags, __SOCKADDR_ARG addr);
+			 int flags, struct sockaddr* addr);
 
 int gIsTCP = 0;
 
@@ -72,7 +76,6 @@ void error(const char* msg)
     exit(EXIT_FAILURE);
 }
 
-
 void daemonFn(void)
 {
     fclose(stdin);
@@ -81,8 +84,10 @@ void daemonFn(void)
     
     areNecessaryFiles();
     
-    struct sigaction sh;
+    struct sigaction sh, schld;
     memset(&sh, 0, sizeof(sh));
+    memset(&sh, 0, sizeof(schld));
+    
     sh.sa_handler = signalHandler;
     sigemptyset(&sh.sa_mask);
     sigaddset(&sh.sa_mask, SIGUSR1);
@@ -90,10 +95,15 @@ void daemonFn(void)
     sigaddset(&sh.sa_mask, SIGTERM);
     sigaddset(&sh.sa_mask, SIGINT);
     
+    schld.sa_handler = childSignalHandler;
+    sigemptyset(&schld.sa_mask);
+    sigaddset(&schld.sa_mask, SIGCHLD);
+    
     if(sigaction(SIGUSR1, &sh, NULL) == -1
        || sigaction(SIGUSR2, &sh, NULL) == -1
        || sigaction(SIGTERM, &sh, NULL) == -1
-       || sigaction(SIGINT, &sh, NULL) == -1)
+       || sigaction(SIGINT, &sh, NULL) == -1
+       ||sigaction(SIGCHLD, &schld, NULL) == -1)
     {
         error("ERROR handling signals");
     }
@@ -214,7 +224,19 @@ void session(int socket, struct sockaddr_in cliAddr)
     char* ip;
     char log[128];
     
-    getnameinfo((struct sockaddr*)&cliAddr,
+    int end = 0;
+    int flag = 0;
+    while(!end)
+    {
+        if(buffLen = avRecv(socket, buffer, BUFFERSIZE, 0,
+                (struct sockaddr*)&cliAddr) == -1)
+        {
+            error("ERROR: Failed to receive");
+        }
+        if(!flag)
+        {
+            flag = 1;
+            getnameinfo((struct sockaddr*)&cliAddr,
                  sizeof(cliAddr),
                  hostname,
                  sizeof(hostname),
@@ -222,27 +244,18 @@ void session(int socket, struct sockaddr_in cliAddr)
                  0,
                  0);
     
-    inet_ntop(AF_INET, &(cliAddr.sin_addr), hostname, sizeof(hostname));
-    ip = inet_ntoa(cliAddr.sin_addr);
-    
-    time(&tTime);
-    
-    sprintf(log, "Startup from %s: %s. Port %u at %s",
-            hostname,
-            ip,
-            ntohs(cliAddr.sin_port),
-            (char*)ctime(&tTime));
-    logg(log);
-    
-    int end = 0;
-    while(!end)
-    {
-        if(buffLen = avRecv(socket, buffer, BUFFERSIZE, 0,
-                (struct sockaddr*)&cliAddr) == -1)
-        {
-            error("ERROR: Failed to receive.");
-        }
+            inet_ntop(AF_INET, &(cliAddr.sin_addr), hostname, sizeof(hostname));
+            ip = inet_ntoa(cliAddr.sin_addr);
 
+            time(&tTime);
+
+            sprintf(log, "Startup from %s: %s. Port %u at %s",
+                    hostname,
+                    ip,
+                    ntohs(cliAddr.sin_port),
+                    (char*)ctime(&tTime));
+            logg(log);
+        }
         buffer[BUFFERSIZE] = '\0';
 
         switch (validateCmd(buffer, NULL))
@@ -508,7 +521,10 @@ void handler_adios(const int socket, struct sockaddr_in cliAddr, char* command)
         avSend(socket, "ERROR Invalid user.\0", 20, 0,
                 (struct sockaddr*)&cliAddr);
     }
-    close(socket);
+    if(gIsTCP)
+    {
+        close(socket);
+    }
 }
 
 int isUserValid(const char* user)
@@ -714,8 +730,13 @@ void signalHandler(int signal)
     exit(EXIT_SUCCESS);
 }
 
+void childSignalHandler(int signal)
+{
+    while(waitpid((pid_t)(-1), 0, WNOHANG) > 0) {}
+}
+
 ssize_t avSend(int socket, const void* buff, size_t n,
-		       int flags, __CONST_SOCKADDR_ARG addr)
+		       int flags, struct sockaddr* addr)
 {
     socklen_t len = sizeof(struct sockaddr_in);
     if(gIsTCP)
@@ -729,7 +750,7 @@ ssize_t avSend(int socket, const void* buff, size_t n,
 }
 
 ssize_t avRecv(int socket, void * buff, size_t n,
-			 int flags, __SOCKADDR_ARG addr)
+			 int flags, struct sockaddr* addr)
 {
     socklen_t len = sizeof(struct sockaddr_in);
     if(gIsTCP)

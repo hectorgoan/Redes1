@@ -1,3 +1,5 @@
+#define __EXTENSIONS__
+
 #include <netinet/in.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -16,9 +18,9 @@ int readCommand(const char* file, const int line, char* command);
 void sendCommand(const int socket, struct sockaddr_in servAddr, char* command);
 void str_cut(char* string, const char cutter);
 ssize_t avSend(int socket, const void* buff, size_t n,
-		       int flags, __CONST_SOCKADDR_ARG addr);
+		       int flags, struct sockaddr* addr);
 ssize_t avRecv(int socket, void* buff, size_t n,
-			 int flags, __SOCKADDR_ARG addr);
+			 int flags, struct sockaddr* addr);
 
 int gIsTCP;
 
@@ -213,7 +215,7 @@ void str_cut(char* string, const char cutter)
 }
 
 ssize_t avSend(int socket, const void* buff, size_t n,
-		       int flags, __CONST_SOCKADDR_ARG addr)
+		       int flags, struct sockaddr* addr)
 {
     socklen_t len = sizeof(struct sockaddr_in);
     if(gIsTCP)
@@ -227,7 +229,7 @@ ssize_t avSend(int socket, const void* buff, size_t n,
 }
 
 ssize_t avRecv(int socket, void * buff, size_t n,
-			 int flags, __SOCKADDR_ARG addr)
+			 int flags, struct sockaddr* addr)
 {
     socklen_t len = sizeof(struct sockaddr_in);
     if(gIsTCP)
