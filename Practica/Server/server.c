@@ -52,7 +52,7 @@ int gLogged = 0;
 int main(void)
 {
     setpgrp();
-    /*switch(fork())
+    switch(fork())
     {
         case -1:
             error("ERROR in fork");
@@ -62,10 +62,8 @@ int main(void)
             exit(EXIT_SUCCESS);
             break;
         default:
-            sleep(60);
             exit(EXIT_SUCCESS);
-    }*/
-    daemonFn();
+    }
 }
 
 void error(const char* msg)
@@ -77,9 +75,9 @@ void error(const char* msg)
 
 void daemonFn(void)
 {
-    //fclose(stdin);
-    //fclose(stdout);
-    //fclose(stderr);
+    fclose(stdin);
+    fclose(stdout);
+    fclose(stderr);
     
     areNecessaryFiles();
     
@@ -448,7 +446,6 @@ void handler_listar(const int socket, struct sockaddr_in cliAddr, char* command)
         }
     }
     avSend(socket, "\n\0", 2, 0, (struct sockaddr*)&cliAddr);
-    
     fclose(f);
 }
 
@@ -540,7 +537,8 @@ int isUserValid(const char* user)
 }
 
 
-//Cut the string for the first second param: ("This is a example.", " ") -> "is a example."
+//Cut the string for the first second param:
+//("This is a example.", " ") -> "is a example."
 void str_cut(char* string, const char cutter)
 {
     char* pch;
@@ -719,7 +717,7 @@ void signalHandler(int signal)
 ssize_t avSend(int socket, const void* buff, size_t n,
 		       int flags, __CONST_SOCKADDR_ARG addr)
 {
-    socklen_t len = sizeof(__CONST_SOCKADDR_ARG);
+    socklen_t len = sizeof(struct sockaddr_in);
     if(gIsTCP)
     {
         return send(socket, buff, n, flags);
@@ -733,7 +731,7 @@ ssize_t avSend(int socket, const void* buff, size_t n,
 ssize_t avRecv(int socket, void * buff, size_t n,
 			 int flags, __SOCKADDR_ARG addr)
 {
-    socklen_t len = sizeof(__CONST_SOCKADDR_ARG);
+    socklen_t len = sizeof(struct sockaddr_in);
     if(gIsTCP)
     {
         return recv(socket, buff, n, flags);

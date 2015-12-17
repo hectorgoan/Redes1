@@ -99,8 +99,6 @@ int main(int argc, char *argv[])
         }
         i++;
     }
-    
-    
     close(sockfd);
     return EXIT_SUCCESS;
 }
@@ -216,7 +214,7 @@ void str_cut(char* string, const char cutter)
 ssize_t avSend(int socket, const void* buff, size_t n,
 		       int flags, __CONST_SOCKADDR_ARG addr)
 {
-    socklen_t len = sizeof(__CONST_SOCKADDR_ARG);
+    socklen_t len = sizeof(struct sockaddr_in);
     if(gIsTCP)
     {
         return send(socket, buff, n, flags);
@@ -230,7 +228,7 @@ ssize_t avSend(int socket, const void* buff, size_t n,
 ssize_t avRecv(int socket, void * buff, size_t n,
 			 int flags, __SOCKADDR_ARG addr)
 {
-    socklen_t len = sizeof(__CONST_SOCKADDR_ARG);
+    socklen_t len = sizeof(struct sockaddr_in);
     if(gIsTCP)
     {
         return recv(socket, buff, n, flags);
