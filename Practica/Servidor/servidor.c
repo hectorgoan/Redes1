@@ -44,7 +44,6 @@ void fichar(char* idEvent, char* idUser, char* date);
 int isUserLogged(const int socket, struct sockaddr_in cliAddr);
 void areNecessaryFiles(void);
 void signalHandler(int signal);
-void childSignalHandler(int signal);
 ssize_t avSend(int socket, const void* buff, size_t n,
 		       int flags, struct sockaddr* addr);
 ssize_t avRecv(int socket, void* buff, size_t n,
@@ -81,13 +80,13 @@ void daemonFn(void)
 {
     //fclose(stdin);
     //fclose(stdout);
-    //fclose(stderr);
+    fclose(stderr);
     
     areNecessaryFiles();
     
-    struct sigaction sh, schld;
+    struct sigaction sh, sChld;
     memset(&sh, 0, sizeof(sh));
-    memset(&sh, 0, sizeof(schld));
+    memset(&sh, 0, sizeof(sChld));
     
     sh.sa_handler = signalHandler;
     sigemptyset(&sh.sa_mask);
@@ -96,15 +95,15 @@ void daemonFn(void)
     sigaddset(&sh.sa_mask, SIGTERM);
     sigaddset(&sh.sa_mask, SIGINT);
     
-    schld.sa_handler = childSignalHandler;
-    sigemptyset(&schld.sa_mask);
-    sigaddset(&schld.sa_mask, SIGCHLD);
+    sChld.sa_handler = SIG_IGN;
+    //sigemptyset(&sChld);
+    //sigaddset(&sChld.sa_mask, SIGCHLD);
     
     if(sigaction(SIGUSR1, &sh, NULL) == -1
        || sigaction(SIGUSR2, &sh, NULL) == -1
        || sigaction(SIGTERM, &sh, NULL) == -1
        || sigaction(SIGINT, &sh, NULL) == -1
-       ||sigaction(SIGCHLD, &schld, NULL) == -1)
+       || sigaction(SIGCHLD, &sChld, NULL) == -1)
     {
         error("ERROR handling signals");
     }
@@ -170,15 +169,13 @@ void daemonFn(void)
     int higher = sockfd > sckUDP ? sockfd : sckUDP;
     fd_set readmask;
     
-    int activity;
     for(;;)
     {
         FD_ZERO(&readmask);
         FD_SET(sockfd, &readmask);
         FD_SET(sckUDP, &readmask); 
         
-        if(activity = select(higher + 1, &readmask, NULL, NULL, NULL) == -1
-           && errno != EINTR)
+        if(select(higher + 1, &readmask, NULL, NULL, NULL) == -1)
         {
             error("ERROR selecting connection");
         }
@@ -732,11 +729,6 @@ void signalHandler(int signal)
 {
     puts("End of execution.");
     exit(EXIT_SUCCESS);
-}
-
-void childSignalHandler(int signal)
-{
-    while(waitpid((pid_t)(-1), 0, WNOHANG) > 0) {}
 }
 
 ssize_t avSend(int socket, const void* buff, size_t n,
