@@ -1,9 +1,3 @@
-/*
-** Fichero: cliente.c
-** Autores: 
-** Héctor Gonzalo Andrés DNI 71038384d
-** Néstor
-*/
 #define __EXTENSIONS__
 
 #include <netinet/in.h>
@@ -24,9 +18,9 @@ int readCommand(const char* file, const int line, char* command);
 void sendCommand(const int socket, struct sockaddr_in servAddr, char* command);
 void str_cut(char* string, const char cutter);
 ssize_t avSend(int socket, const void* buff, size_t n,
-               int flags, struct sockaddr* addr);
+		       int flags, struct sockaddr* addr);
 ssize_t avRecv(int socket, void* buff, size_t n,
-             int flags, struct sockaddr* addr);
+			 int flags, struct sockaddr* addr);
 
 int gIsTCP;
 
@@ -221,7 +215,7 @@ void str_cut(char* string, const char cutter)
 }
 
 ssize_t avSend(int socket, const void* buff, size_t n,
-               int flags, struct sockaddr* addr)
+		       int flags, struct sockaddr* addr)
 {
     socklen_t len = sizeof(struct sockaddr_in);
     if(gIsTCP)
@@ -235,7 +229,7 @@ ssize_t avSend(int socket, const void* buff, size_t n,
 }
 
 ssize_t avRecv(int socket, void * buff, size_t n,
-             int flags, struct sockaddr* addr)
+			 int flags, struct sockaddr* addr)
 {
     socklen_t len = sizeof(struct sockaddr_in);
     if(gIsTCP)
